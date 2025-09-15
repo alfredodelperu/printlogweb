@@ -1,2 +1,2 @@
 # printlogweb
-Dashboard y sistema de log de impresión para gestión de impresoras y recursos de impresión.
+Dashboard y sistema de log de impresión para gestión de impresoras y recursos de impresión...
