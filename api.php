@@ -1,16 +1,15 @@
 <?php
-// api.php - Versión unificada para printologweb (riplog + printolog)
+// api.php - Versión final con tres fuentes independientes: riplog, HistoryTasks, RecordTasks
 include "config.php";
 header('Content-Type: application/json');
 
-$type = $_GET['type'] ?? 'printolog'; // 'riplog' o 'printolog'
+$type = $_GET['type'] ?? 'riplog'; // 'riplog', 'history', 'record'
 $limit = $_GET['limit'] ?? 1000;
 
-// Validar tipo
-$allowedTypes = ['riplog', 'printolog'];
+$allowedTypes = ['riplog', 'history', 'record'];
 if (!in_array($type, $allowedTypes)) {
     http_response_code(400);
-    echo json_encode(['error' => 'Tipo no válido. Usa: riplog o printolog']);
+    echo json_encode(['error' => 'Tipo no válido. Usa: riplog, history o record']);
     exit;
 }
 
@@ -27,8 +26,8 @@ $whereConditions = [];
 $params = [];
 $paramCount = 1;
 
-// Rango de fechas
-if ($dateFrom && $dateTo) {
+// Rango de fechas (solo para history y record)
+if ($dateFrom && $dateTo && in_array($type, ['history', 'record'])) {
     $dateFromFull = $dateFrom . ' 00:00:00+00';
     $dateToFull = $dateTo . ' 23:59:59+00';
     $whereConditions[] = "fecha1 BETWEEN $" . $paramCount . " AND $" . ($paramCount + 1);
@@ -43,7 +42,11 @@ if ($filename) {
     $filenameConditions = [];
     foreach ($terms as $term) {
         if (!empty($term)) {
-            $filenameConditions[] = "LOWER(bmppath) LIKE $" . $paramCount;
+            if ($type === 'riplog') {
+                $filenameConditions[] = "LOWER(archivo) LIKE $" . $paramCount;
+            } else {
+                $filenameConditions[] = "LOWER(bmppath) LIKE $" . $paramCount;
+            }
             $params[] = '%' . strtolower($term) . '%';
             $paramCount++;
         }
@@ -70,10 +73,17 @@ if ($pcs) {
     }
 }
 
-// Estado (solo para printolog)
-if ($event !== '' && $type === 'printolog') {
+// Estado (solo para history y record)
+if ($event !== '' && in_array($type, ['history', 'record'])) {
     $whereConditions[] = "completado = $" . $paramCount;
     $params[] = (int)$event;
+    $paramCount++;
+}
+
+// Tipo de evento (solo para riplog)
+if ($event !== '' && $type === 'riplog') {
+    $whereConditions[] = "evento = $" . $paramCount;
+    $params[] = $event;
     $paramCount++;
 }
 
@@ -95,18 +105,23 @@ if ($selected) {
 
 $whereClause = !empty($whereConditions) ? 'WHERE ' . implode(' AND ', $whereConditions) : '';
 
-// Consulta según tipo
-$order_by = $_GET['order_by'] ?? 'fecha1';
+$order_by = $_GET['order_by'] ?? ($type === 'riplog' ? 'fecha,hora' : 'fecha1');
 $order_dir = strtoupper($_GET['order_dir'] ?? 'DESC');
-$allowedColumns = ['id', 'bmppath', 'anchomm', 'largomm', 'largototal', 'copiasrequeridas', 'produccion', 'pc_name', 'fecha1', 'fecha2', 'evento', 'archivo'];
 
-if (!in_array($order_by, $allowedColumns)) {
-    $order_by = 'fecha1';
+$allowedColumns = [
+    'riplog' => ['id', 'archivo', 'evento', 'ancho', 'largo', 'copias', 'fecha', 'hora', 'pc_name'],
+    'history' => ['id', 'bmppath', 'anchomm', 'largomm', 'copiasrequeridas', 'completado', 'produccion', 'fecha1', 'fecha2', 'pc_name'],
+    'record' => ['id', 'bmppath', 'anchomm', 'largomm', 'copiasrequeridas', 'completado', 'produccion', 'fecha1', 'fecha2', 'pc_name']
+];
+
+if (!in_array($order_by, $allowedColumns[$type])) {
+    $order_by = $type === 'riplog' ? 'fecha,hora' : 'fecha1';
 }
 if ($order_dir !== 'ASC') {
     $order_dir = 'DESC';
 }
 
+// Consulta según tipo
 if ($type === 'riplog') {
     $query = "
         SELECT 
@@ -132,43 +147,36 @@ if ($type === 'riplog') {
         FROM riplog
         $whereClause
     ";
-} else {
+
+} elseif ($type === 'history') {
     $query = "
         SELECT 
-            h.id,
-            h.codigoimagen,
-            h.bmppath,
-            h.anchoPx,
-            h.largoPx,
-            h.resolucionX,
-            h.resolucionY,
-            h.anchomm,
-            h.largomm,
-            h.anchomm2,
-            h.largomm2,
-            h.anchomm3,
-            h.copiasrequeridas,
-            h.completado,
-            h.produccion,
-            h.velocidadm2h,
-            h.velocidadlineal,
-            h.modoimpresion,
-            h.fecha1,
-            h.fecha2,
-            h.tiempotranscurrido1,
-            h.tiempotranscurrido2,
-            h.uid,
-            h.pc_name,
-            h.largototal,
-            h.largoimpreso,
-            h.copiasimpresas,
-            h.largototal / 1000 AS ml_total,
-            (h.anchomm * h.largomm) / 1000000 AS m2_total
-        FROM (
-            SELECT * FROM \"HistoryTasks\"
-            UNION ALL
-            SELECT * FROM \"RecordTasks\"
-        ) AS h
+            id,
+            codigoimagen,
+            bmppath,
+            anchomm,
+            largomm,
+            anchomm2,
+            largomm2,
+            anchomm3,
+            copiasrequeridas,
+            completado,
+            produccion,
+            velocidadm2h,
+            velocidadlineal,
+            modoimpresion,
+            fecha1,
+            fecha2,
+            tiempotranscurrido1,
+            tiempotranscurrido2,
+            uid,
+            pc_name,
+            largototal,
+            largoimpreso,
+            copiasimpresas,
+            largototal / 1000 AS ml_total,
+            (anchomm * largomm) / 1000000 AS m2_total
+        FROM \"HistoryTasks\"
         $whereClause
         ORDER BY $order_by $order_dir
         LIMIT $limit
@@ -182,11 +190,53 @@ if ($type === 'riplog') {
             SUM(largototal / 1000) as ml_total,
             SUM(anchomm * largomm / 1000000) as m2_total,
             COUNT(DISTINCT pc_name) as unique_pcs
-        FROM (
-            SELECT * FROM \"HistoryTasks\"
-            UNION ALL
-            SELECT * FROM \"RecordTasks\"
-        ) AS h
+        FROM \"HistoryTasks\"
+        $whereClause
+    ";
+
+} else { // record
+    $query = "
+        SELECT 
+            id,
+            codigoimagen,
+            bmppath,
+            anchomm,
+            largomm,
+            anchomm2,
+            largomm2,
+            anchomm3,
+            copiasrequeridas,
+            completado,
+            produccion,
+            velocidadm2h,
+            velocidadlineal,
+            modoimpresion,
+            fecha1,
+            fecha2,
+            tiempotranscurrido1,
+            tiempotranscurrido2,
+            uid,
+            pc_name,
+            largototal,
+            largoimpreso,
+            copiasimpresas,
+            largototal / 1000 AS ml_total,
+            (anchomm * largomm) / 1000000 AS m2_total
+        FROM \"RecordTasks\"
+        $whereClause
+        ORDER BY $order_by $order_dir
+        LIMIT $limit
+    ";
+
+    $statsQuery = "
+        SELECT 
+            COUNT(*) as total,
+            COUNT(CASE WHEN completado = 1 THEN 1 END) as completed_count,
+            COUNT(CASE WHEN completado = 0 THEN 1 END) as incomplete_count,
+            SUM(largototal / 1000) as ml_total,
+            SUM(anchomm * largomm / 1000000) as m2_total,
+            COUNT(DISTINCT pc_name) as unique_pcs
+        FROM \"RecordTasks\"
         $whereClause
     ";
 }
@@ -262,7 +312,7 @@ $pcs_list = [];
 if ($type === 'riplog') {
     $pcQuery = "SELECT DISTINCT pc_name FROM riplog WHERE pc_name IS NOT NULL ORDER BY pc_name";
 } else {
-    $pcQuery = "SELECT DISTINCT pc_name FROM (SELECT pc_name FROM \"HistoryTasks\" UNION ALL SELECT pc_name FROM \"RecordTasks\") AS all_pcs WHERE pc_name IS NOT NULL ORDER BY pc_name";
+    $pcQuery = "SELECT DISTINCT pc_name FROM \"{$type === 'history' ? 'HistoryTasks' : 'RecordTasks'}\" WHERE pc_name IS NOT NULL ORDER BY pc_name";
 }
 $pcResult = pg_query($conn, $pcQuery);
 while ($pcRow = pg_fetch_assoc($pcResult)) {

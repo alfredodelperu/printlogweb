@@ -7,10 +7,10 @@ let currentPage = 1;
 const itemsPerPage = 50;
 let isLoadingData = false;
 let debugMode = false;
-let currentType = 'printolog'; // 'riplog' o 'printolog'
+let currentType = 'riplog'; // 'riplog', 'history', 'record'
 
 let sortOrder = JSON.parse(localStorage.getItem('dashboardSortOrder')) || {
-    column: 'fecha1',
+    column: 'fecha,hora',
     direction: 'desc'
 };
 
@@ -43,7 +43,7 @@ function loadDashboardState() {
     document.getElementById('eventFilter').value = state.eventFilter || '';
     document.getElementById('showSizeColumn').checked = state.showSizeColumn || false;
     document.getElementById('autoRefresh').checked = state.autoRefresh || true;
-    currentType = state.currentType || 'printolog';
+    currentType = state.currentType || 'riplog';
 
     document.querySelectorAll('.tab-btn').forEach(btn => {
         btn.classList.remove('active');
@@ -363,8 +363,8 @@ function updateSelectedStats() {
     const selectedData = filteredData.filter(item => selectedRows.has(item.id));
     const selectedStats = {
         total: selectedData.length,
-        completed_count: currentType === 'printolog' ? selectedData.filter(item => item.completado === 1).length : 0,
-        incomplete_count: currentType === 'printolog' ? selectedData.filter(item => item.completado === 0).length : 0,
+        completed_count: currentType === 'riplog' ? 0 : selectedData.filter(item => item.completado === 1).length,
+        incomplete_count: currentType === 'riplog' ? 0 : selectedData.filter(item => item.completado === 0).length,
         ml_total: selectedData.reduce((sum, item) => sum + parseFloat(item.ml_total || 0), 0).toFixed(2),
         m2_total: selectedData.reduce((sum, item) => sum + parseFloat(item.m2_total || 0), 0).toFixed(2),
         unique_pcs: new Set(selectedData.map(item => item.pc_name).filter(pc => pc)).size
@@ -485,7 +485,7 @@ function updateTable() {
             `;
         });
 
-    } else { // printolog
+    } else { // history o record
         headers = `
             <th style="padding: 12px; text-align: left;">
                 <input type="checkbox" onchange="toggleSelectAll(this)" 
