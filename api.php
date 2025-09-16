@@ -1,5 +1,5 @@
 <?php
-// api.php - Versión final corregida y sin errores de sintaxis
+// api.php - Versión final para printologweb (solo esta carpeta)
 include "config.php";
 header('Content-Type: application/json');
 
@@ -26,14 +26,23 @@ $whereConditions = [];
 $params = [];
 $paramCount = 1;
 
-// Rango de fechas (solo para history y record)
-if ($dateFrom && $dateTo && in_array($type, ['history', 'record'])) {
-    $dateFromFull = $dateFrom . ' 00:00:00+00';
-    $dateToFull = $dateTo . ' 23:59:59+00';
-    $whereConditions[] = "fecha1 BETWEEN $" . $paramCount . " AND $" . ($paramCount + 1);
-    $params[] = $dateFromFull;
-    $params[] = $dateToFull;
-    $paramCount += 2;
+// Rango de fechas (aplicado según tabla)
+if ($dateFrom && $dateTo) {
+    if ($type === 'riplog') {
+        $dateFromFull = $dateFrom . ' 00:00:00';
+        $dateToFull = $dateTo . ' 23:59:59';
+        $whereConditions[] = "fecha BETWEEN $" . $paramCount . " AND $" . ($paramCount + 1);
+        $params[] = $dateFromFull;
+        $params[] = $dateToFull;
+        $paramCount += 2;
+    } elseif (in_array($type, ['history', 'record'])) {
+        $dateFromFull = $dateFrom . ' 00:00:00+00';
+        $dateToFull = $dateTo . ' 23:59:59+00';
+        $whereConditions[] = "fecha1 BETWEEN $" . $paramCount . " AND $" . ($paramCount + 1);
+        $params[] = $dateFromFull;
+        $params[] = $dateToFull;
+        $paramCount += 2;
+    }
 }
 
 // Nombre de archivo
@@ -131,10 +140,10 @@ if ($type === 'riplog') {
             (ancho * largo * copias) / 10000 AS m2_total
         FROM riplog
         $whereClause
-        ORDER BY $order_by $order_dir
+        ORDER BY fecha DESC, hora DESC
         LIMIT $limit
     ";
-    
+
     $statsQuery = "
         SELECT 
             COUNT(*) as total,
@@ -149,6 +158,8 @@ if ($type === 'riplog') {
     ";
 
 } elseif ($type === 'history') {
+    $table_name = 'HistoryTasks';
+
     $query = "
         SELECT 
             id,
@@ -176,7 +187,7 @@ if ($type === 'riplog') {
             copiasimpresas,
             largototal / 1000 AS ml_total,
             (anchomm * largomm) / 1000000 AS m2_total
-        FROM \"HistoryTasks\"
+        FROM \"$table_name\"
         $whereClause
         ORDER BY $order_by $order_dir
         LIMIT $limit
@@ -190,11 +201,13 @@ if ($type === 'riplog') {
             SUM(largototal / 1000) as ml_total,
             SUM(anchomm * largomm / 1000000) as m2_total,
             COUNT(DISTINCT pc_name) as unique_pcs
-        FROM \"HistoryTasks\"
+        FROM \"$table_name\"
         $whereClause
     ";
 
 } else { // record
+    $table_name = 'RecordTasks';
+
     $query = "
         SELECT 
             id,
@@ -222,7 +235,7 @@ if ($type === 'riplog') {
             copiasimpresas,
             largototal / 1000 AS ml_total,
             (anchomm * largomm) / 1000000 AS m2_total
-        FROM \"RecordTasks\"
+        FROM \"$table_name\"
         $whereClause
         ORDER BY $order_by $order_dir
         LIMIT $limit
@@ -236,7 +249,7 @@ if ($type === 'riplog') {
             SUM(largototal / 1000) as ml_total,
             SUM(anchomm * largomm / 1000000) as m2_total,
             COUNT(DISTINCT pc_name) as unique_pcs
-        FROM \"RecordTasks\"
+        FROM \"$table_name\"
         $whereClause
     ";
 }
@@ -308,17 +321,26 @@ if (!$stats_result) {
     $stats = pg_fetch_assoc($stats_result);
 }
 
+// Obtener lista de PCs únicas según el tipo
 $pcs_list = [];
+
 if ($type === 'riplog') {
     $pcQuery = "SELECT DISTINCT pc_name FROM riplog WHERE pc_name IS NOT NULL ORDER BY pc_name";
-} else {
-    $tableName = $type === 'history' ? 'HistoryTasks' : 'RecordTasks';
-    $pcQuery = "SELECT DISTINCT pc_name FROM \"$tableName\" WHERE pc_name IS NOT NULL ORDER BY pc_name";    
-
+} elseif ($type === 'history') {
+    $table_name = 'HistoryTasks';
+    $pcQuery = "SELECT DISTINCT pc_name FROM \"$table_name\" WHERE pc_name IS NOT NULL ORDER BY pc_name";
+} else { // record
+    $table_name = 'RecordTasks';
+    $pcQuery = "SELECT DISTINCT pc_name FROM \"$table_name\" WHERE pc_name IS NOT NULL ORDER BY pc_name";
 }
+
 $pcResult = pg_query($conn, $pcQuery);
+$pcs_list = [];
 while ($pcRow = pg_fetch_assoc($pcResult)) {
-    $pcs_list[] = $pcRow['pc_name'];
+    $clean_pc = trim($pcRow['pc_name']);
+    if (!empty($clean_pc)) {
+        $pcs_list[] = $clean_pc;
+    }
 }
 
 echo json_encode([
