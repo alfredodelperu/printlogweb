@@ -32,7 +32,10 @@ function saveDashboardState() {
 
 function loadDashboardState() {
     const saved = localStorage.getItem('dashboardState');
-    if (!saved) return;
+    if (!saved) {
+        initializeDates();
+        return;
+    }
 
     const state = JSON.parse(saved);
 
@@ -58,6 +61,7 @@ function loadDashboardState() {
     });
     updateSelectAllPcsState();
 
+    validateEventFilterValue();
     updateEventFilterLabel();
     updateTableTitle();
 
@@ -127,6 +131,11 @@ function setDateRange(range) {
 async function loadData() {
     if (isLoadingData) return;
     isLoadingData = true;
+
+    // ✅ FORZAR FECHA ACTUAL SI ESTÁ VACÍA
+    if (!document.getElementById('dateFrom').value || !document.getElementById('dateTo').value) {
+        initializeDates();
+    }
 
     try {
         const params = new URLSearchParams();
@@ -211,12 +220,16 @@ function updatePcFilter() {
             <label for="selectAllPcs"><strong>Seleccionar Todas (${allPcs.length})</strong></label>
         </div>
     `;
-    html += allPcs.map(pc => `
-        <div class="multi-select-option pc-option">
-            <input type="checkbox" id="pc_${pc.replace(/[^a-zA-Z0-9]/g, '_')}" value="${pc}" checked onchange="onPcChange(this)">
-            <label for="pc_${pc.replace(/[^a-zA-Z0-9]/g, '_')}">${pc}</label>
-        </div>
-    `).join('');
+    html += allPcs.map(pc => {
+        const cleanPc = pc.trim(); // ✅ LIMPIA ESPACIOS
+        if (!cleanPc) return '';
+        return `
+            <div class="multi-select-option pc-option">
+                <input type="checkbox" id="pc_${cleanPc.replace(/[^a-zA-Z0-9]/g, '_')}" value="${cleanPc}" checked onchange="onPcChange(this)">
+                <label for="pc_${cleanPc.replace(/[^a-zA-Z0-9]/g, '_')}">${cleanPc}</label>
+            </div>
+        `;
+    }).join('');
     pcFilter.innerHTML = html;
 }
 
@@ -539,7 +552,7 @@ function updateTable() {
             const dimensions = `${anchoCm} × ${largoCm}`;
             const mlTotal = item.ml_total ? item.ml_total.toFixed(2) : '0.00';
             const m2Total = item.m2_total ? item.m2_total.toFixed(2) : '0.00';
-            const copias = `${item.copias_requeridas} / ${item.copias_impresas || 0}`;
+            const copias = `${item.copias_requeridas} / ${item.copiasimpresas || 0}`;
             const produccion = item.produccion ? item.produccion.toFixed(1) + '%' : '0.0%';
             const fecha1 = item.fecha1 ? new Date(item.fecha1).toLocaleString('es-ES') : '-';
 
@@ -797,6 +810,17 @@ function updateEventFilterLabel() {
             <option value="0">Incompletas</option>
         `;
     }
+    validateEventFilterValue(); // ✅ VALIDA VALOR DESPUÉS DE CAMBIAR
+}
+
+function validateEventFilterValue() {
+    const select = document.getElementById('eventFilter');
+    const options = Array.from(select.options).map(opt => opt.value);
+    const currentValue = select.value;
+
+    if (currentValue && !options.includes(currentValue)) {
+        select.value = ''; // Limpiar si no es válido
+    }
 }
 
 function updateTableTitle() {
@@ -834,6 +858,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 btn.classList.add('active');
                 currentType = btn.dataset.type;
                 currentPage = 1;
+
+                // ✅ REINICIA FILTRO AL CAMBIAR PESTAÑA
+                document.getElementById('eventFilter').value = '';
+                
                 loadData();
                 saveDashboardState();
                 updateEventFilterLabel();
