@@ -567,7 +567,7 @@ tr[selected] td input[type="checkbox"]:checked::after {
 }
 
 /* =============================================
-   MODAL DE DETALLE DE IMPRESIÓN
+   MODAL DE DETALLE DE IMPRESIÓN - VERSIÓN CENTRADA
 ============================================= */
 
 .modal {
@@ -580,6 +580,7 @@ tr[selected] td input[type="checkbox"]:checked::after {
     height: 100%;
     overflow: auto;
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: rgba(0, 0, 0, 0.7); /* Fondo oscuro directamente aquí */
 }
 
 .modal-overlay {
@@ -588,12 +589,11 @@ tr[selected] td input[type="checkbox"]:checked::after {
     left: 0;
     width: 100%;
     height: 100%;
-    background-color: rgba(0, 0, 0, 0.7);
 }
 
 .modal-content {
     background-color: #fff;
-    margin: 5% auto;
+    margin: 5% auto; /* Centra automáticamente en vertical y horizontal */
     padding: 20px;
     border-radius: 12px;
     width: 90%;
