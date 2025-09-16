@@ -1,8 +1,7 @@
 <?php
-// index.php - Versión con verificación temprana de conexión a PostgreSQL
 require_once 'config.php';
 
-// 🚨 VERIFICACIÓN TEMPRANA DE CONEXIÓN A BASE DE DATOS
+// Verificación temprana de conexión
 if (!$conn) {
     die('<!DOCTYPE html>
 <html lang="es">
@@ -21,8 +20,8 @@ if (!$conn) {
         <p>Por favor, verifica que:</p>
         <ul style="text-align: left; margin-left: 15px;">
             <li>El servicio <code>fc_memoria</code> esté activo en EasyPanel</li>
-            <li>La red Docker del contenedor PHP esté conectada a <code>easypanel_default</code></li>
-            <li>Las credenciales en <code>config.php</code> sean correctas</li>
+            <li>La app está conectada a la base de datos <code>impresiones_fullcolor</code></li>
+            <li>Las credenciales son correctas (gestionadas por EasyPanel)</li>
         </ul>
         <p><strong>Detalle técnico:</strong></p>
         <code>' . htmlspecialchars(pg_last_error()) . '</code>
@@ -30,8 +29,6 @@ if (!$conn) {
 </body>
 </html>');
 }
-
-// Si la conexión es exitosa, seguimos cargando el dashboard normalmente
 ?>
 
 <!DOCTYPE html>
@@ -39,7 +36,7 @@ if (!$conn) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🖨️ PrintologWeb - Monitor de Impresiones</title>
+    <title>🖨️ PrintologWeb - Dashboard Unificado</title>
     <link rel="stylesheet" href="estilos.css">
 </head>
 
@@ -47,13 +44,13 @@ if (!$conn) {
 <div class="container">
     <div class="header">
         <h1>🖨️ PrintologWeb</h1>
-        <p>Monitor de impresiones en tiempo real - Historial y En Proceso</p>
+        <p>Dashboard unificado: Impresiones industriales + Procesos RIP/PRINT</p>
     </div>
 
-    <!-- PESTAÑAS DE TABLAS -->
+    <!-- PESTAÑAS UNIFICADAS -->
     <div class="table-selector">
-        <button class="tab-btn active" data-table="HistoryTasks">Historial</button>
-        <button class="tab-btn" data-table="RecordTasks">En Proceso</button>
+        <button class="tab-btn active" data-type="printolog">Impresiones</button>
+        <button class="tab-btn" data-type="riplog">RIP / PRINT</button>
     </div>
 
     <div class="stats-grid">
@@ -132,7 +129,7 @@ if (!$conn) {
             </div>
 
             <div class="filter-group">
-                <label class="filter-label">🎯 Estado</label>
+                <label class="filter-label">🎯 Tipo</label>
                 <select class="filter-select" id="eventFilter">
                     <option value="">Todos los estados</option>
                     <option value="1">Completadas</option>
@@ -154,14 +151,12 @@ if (!$conn) {
                     <span>Mostrar M²</span>
                 </div>
                 <div class="export-buttons">
-                    <!-- Exportar página actual -->
                     <button class="export-icon" onclick="exportData('excel')" title="Exportar página actual como Excel">📊</button>
                     <button class="export-icon" onclick="exportData('csv')" title="Exportar página actual como CSV">📄</button>
                     <button class="export-icon" onclick="exportData('pdf')" title="Exportar página actual como PDF">📋</button>
 
                     <hr style="margin: 15px 0; border-color: #ddd;">
 
-                    <!-- Exportar TODO el resultado filtrado -->
                     <button class="export-icon" onclick="exportData('excel', true)" title="Exportar todos los registros filtrados (Excel)">🚀</button>
                     <button class="export-icon" onclick="exportData('csv', true)" title="Exportar todos los registros filtrados (CSV)">🚀</button>
                     <button class="export-icon" onclick="exportData('pdf', true)" title="Exportar todos los registros filtrados (PDF)">🚀</button>

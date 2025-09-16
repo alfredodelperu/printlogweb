@@ -1,5 +1,3 @@
-// funciones.js - Versión final limpia y profesional para printologweb
-
 let autoRefreshInterval;
 let allData = [];
 let filteredData = [];
@@ -9,14 +7,13 @@ let currentPage = 1;
 const itemsPerPage = 50;
 let isLoadingData = false;
 let debugMode = false;
+let currentType = 'printolog'; // 'riplog' o 'printolog'
 
-// Estado de ordenamiento
 let sortOrder = JSON.parse(localStorage.getItem('dashboardSortOrder')) || {
     column: 'fecha1',
     direction: 'desc'
 };
 
-// Estado del dashboard guardado en localStorage
 function saveDashboardState() {
     const state = {
         dateFrom: document.getElementById('dateFrom').value,
@@ -27,7 +24,7 @@ function saveDashboardState() {
         showSizeColumn: document.getElementById('showSizeColumn').checked,
         autoRefresh: document.getElementById('autoRefresh').checked,
         selectedPcs: Array.from(document.querySelectorAll('#pcFilter input[type="checkbox"]:checked:not(#selectAllPcs)')).map(cb => cb.value),
-        currentTable: currentTable
+        currentType: currentType
     };
     localStorage.setItem('dashboardState', JSON.stringify(state));
     if (debugMode) console.log('💾 Dashboard state guardado:', state);
@@ -46,12 +43,11 @@ function loadDashboardState() {
     document.getElementById('eventFilter').value = state.eventFilter || '';
     document.getElementById('showSizeColumn').checked = state.showSizeColumn || false;
     document.getElementById('autoRefresh').checked = state.autoRefresh || true;
-    currentTable = state.currentTable || 'HistoryTasks';
+    currentType = state.currentType || 'printolog';
 
-    // Actualizar pestaña activa
     document.querySelectorAll('.tab-btn').forEach(btn => {
         btn.classList.remove('active');
-        if (btn.dataset.table === currentTable) {
+        if (btn.dataset.type === currentType) {
             btn.classList.add('active');
         }
     });
@@ -122,7 +118,7 @@ function setDateRange(range) {
         document.querySelector(`[onclick="setDateRange('${range}')"]`)?.classList.add('active');
     }
 
-    loadData(); // Actualiza automáticamente
+    loadData();
 }
 
 async function loadData() {
@@ -131,7 +127,7 @@ async function loadData() {
 
     try {
         const params = new URLSearchParams();
-        params.append('table', currentTable);
+        params.append('type', currentType);
 
         const dateFromValue = document.getElementById('dateFrom').value;
         const dateToValue = document.getElementById('dateTo').value;
@@ -299,7 +295,7 @@ function toggleSelectAll(checkbox) {
 function exportData(format, exportAll = false) {
     const params = new URLSearchParams();
     params.append('format', format);
-    params.append('table', currentTable);
+    params.append('type', currentType);
 
     if (selectedRows.size > 0) {
         params.append('selected', Array.from(selectedRows).join(','));
@@ -344,8 +340,13 @@ function exportData(format, exportAll = false) {
 
 function updateStatsFromServer(stats) {
     document.getElementById('totalJobs').textContent = stats.total || 0;
-    document.getElementById('completedJobs').textContent = stats.completed_count || 0;
-    document.getElementById('incompleteJobs').textContent = stats.incomplete_count || 0;
+    if (currentType === 'riplog') {
+        document.getElementById('completedJobs').textContent = stats.rip_count + stats.print_count || 0;
+        document.getElementById('incompleteJobs').textContent = 0;
+    } else {
+        document.getElementById('completedJobs').textContent = stats.completed_count || 0;
+        document.getElementById('incompleteJobs').textContent = stats.incomplete_count || 0;
+    }
     document.getElementById('mlTotal').textContent = stats.ml_total || 0;
     document.getElementById('m2Total').textContent = stats.m2_total || 0;
     document.getElementById('uniquePcs').textContent = stats.unique_pcs || 0;
@@ -360,10 +361,10 @@ function updateSelectedStats() {
     const selectedData = filteredData.filter(item => selectedRows.has(item.id));
     const selectedStats = {
         total: selectedData.length,
-        completed_count: selectedData.filter(item => item.completado === 1).length,
-        incomplete_count: selectedData.filter(item => item.completado === 0).length,
-        ml_total: selectedData.reduce((sum, item) => sum + parseFloat(item.largototal || 0), 0).toFixed(2),
-        m2_total: selectedData.reduce((sum, item) => sum + parseFloat(item.anchomm * item.largomm / 1000000 || 0), 0).toFixed(2),
+        completed_count: currentType === 'printolog' ? selectedData.filter(item => item.completado === 1).length : 0,
+        incomplete_count: currentType === 'printolog' ? selectedData.filter(item => item.completado === 0).length : 0,
+        ml_total: selectedData.reduce((sum, item) => sum + parseFloat(item.ml_total || 0), 0).toFixed(2),
+        m2_total: selectedData.reduce((sum, item) => sum + parseFloat(item.m2_total || 0), 0).toFixed(2),
         unique_pcs: new Set(selectedData.map(item => item.pc_name).filter(pc => pc)).size
     };
 
@@ -393,39 +394,75 @@ function updateTable() {
         return;
     }
 
-    const sizeColumnHeader = showSizeColumn ? '<th>M²</th>' : '';
+    let sizeColumnHeader = '';
+    let tableHeaders = '';
+
+    if (currentType === 'riplog') {
+        tableHeaders = `
+            <th style="padding: 12px; text-align: left;">
+                <input type="checkbox" onchange="toggleSelectAll(this)" 
+                       ${selectedRows.size > 0 && selectedRows.size === pageData.length ? 'checked' : ''}>
+            </th>
+            <th class="filename-col" style="cursor: pointer;" data-column="archivo">
+                Archivo <span class="sort-indicator"></span>
+            </th>
+            <th class="event-col" style="cursor: pointer;" data-column="evento">
+                Evento <span class="sort-indicator"></span>
+            </th>
+            <th class="dimensions-col" style="cursor: pointer;" data-column="ancho,largo">
+                Dimensiones (cm) <span class="sort-indicator"></span>
+            </th>
+            <th class="copies-col" style="cursor: pointer;" data-column="copias">
+                Copias <span class="sort-indicator"></span>
+            </th>
+            <th class="ml-col" style="cursor: pointer;" data-column="ml_total">
+                ML Total <span class="sort-indicator"></span>
+            </th>
+            ${showSizeColumn ? '<th>M²</th>' : ''}
+            <th class="pc-col" style="cursor: pointer;" data-column="pc_name">
+                PC <span class="sort-indicator"></span>
+            </th>
+            <th class="date-col" style="cursor: pointer;" data-column="fecha,hora">
+                Fecha/Hora <span class="sort-indicator"></span>
+            </th>
+        `;
+    } else {
+        tableHeaders = `
+            <th style="padding: 12px; text-align: left;">
+                <input type="checkbox" onchange="toggleSelectAll(this)" 
+                       ${selectedRows.size > 0 && selectedRows.size === pageData.length ? 'checked' : ''}>
+            </th>
+            <th class="filename-col" style="cursor: pointer;" data-column="bmppath">
+                Archivo <span class="sort-indicator"></span>
+            </th>
+            <th class="dimensions-col" style="cursor: pointer;" data-column="ancho_cm,largo_cm">
+                Dimensiones (cm) <span class="sort-indicator"></span>
+            </th>
+            <th class="largo-col" style="cursor: pointer;" data-column="largototal">
+                Largo Total (m) <span class="sort-indicator"></span>
+            </th>
+            <th class="copies-col" style="cursor: pointer;" data-column="copias_requeridas">
+                Copias <span class="sort-indicator"></span>
+            </th>
+            <th class="produccion-col" style="cursor: pointer;" data-column="produccion">
+                Producción (%) <span class="sort-indicator"></span>
+            </th>
+            <th class="pc-col" style="cursor: pointer;" data-column="pc_name">
+                PC <span class="sort-indicator"></span>
+            </th>
+            <th class="date-col" style="cursor: pointer;" data-column="fecha1">
+                Fecha/Hora <span class="sort-indicator"></span>
+            </th>
+            ${showSizeColumn ? '<th>M²</th>' : ''}
+        `;
+    }
 
     let tableHTML = `
         <div class="table-responsive">
             <table style="width: 100%; border-collapse: collapse;">
                 <thead>
                     <tr style="background: #f8f9fa;">
-                        <th style="padding: 12px; text-align: left;">
-                            <input type="checkbox" onchange="toggleSelectAll(this)" 
-                                   ${selectedRows.size > 0 && selectedRows.size === pageData.length ? 'checked' : ''}>
-                        </th>
-                        <th class="filename-col" style="cursor: pointer;" data-column="bmppath">
-                            Archivo <span class="sort-indicator"></span>
-                        </th>
-                        <th class="dimensions-col" style="cursor: pointer;" data-column="anchomm,largomm">
-                            Dimensiones (cm) <span class="sort-indicator"></span>
-                        </th>
-                        <th class="largo-col" style="cursor: pointer;" data-column="largototal">
-                            Largo Total (m) <span class="sort-indicator"></span>
-                        </th>
-                        <th class="copies-col" style="cursor: pointer;" data-column="copiasrequeridas">
-                            Copias <span class="sort-indicator"></span>
-                        </th>
-                        <th class="produccion-col" style="cursor: pointer;" data-column="produccion">
-                            Producción (%) <span class="sort-indicator"></span>
-                        </th>
-                        <th class="pc-col" style="cursor: pointer;" data-column="pc_name">
-                            PC <span class="sort-indicator"></span>
-                        </th>
-                        <th class="date-col" style="cursor: pointer;" data-column="fecha1">
-                            Fecha/Hora <span class="sort-indicator"></span>
-                        </th>
-                        ${sizeColumnHeader}
+                        ${tableHeaders}
                     </tr>
                 </thead>
                 <tbody>
@@ -433,19 +470,34 @@ function updateTable() {
 
     pageData.forEach(item => {
         const isSelected = selectedRows.has(item.id);
-        const anchoCm = item.anchomm ? (item.anchomm / 10).toFixed(1) : '-';
-        const largoCm = item.largomm ? (item.largomm / 10).toFixed(1) : '-';
-        const dimensions = `${anchoCm} × ${largoCm}`;
-        const largoTotal = item.largototal ? parseFloat(item.largototal).toFixed(2) : '0.00';
-        const produccion = item.produccion ? parseFloat(item.produccion).toFixed(1) : '0.0';
-        const copias = `${item.copiasrequeridas} / ${item.copiasimpresas || 0}`;
-        const m2Total = item.anchomm && item.largomm ? (item.anchomm * item.largomm / 1000000).toFixed(2) : '0.00';
-        const fecha1 = item.fecha1 ? new Date(item.fecha1).toLocaleString('es-ES') : '-';
+        let statusClass = '';
+        let dimensions = '-';
+        let copias = '-';
+        let mlTotal = '0.00';
+        let m2Total = '0.00';
+        let fechaHora = '-';
+        let produccion = '0.0%';
+
+        if (currentType === 'riplog') {
+            statusClass = item.evento === 'RIP' ? 'rip-event' : 'print-event';
+            dimensions = item.ancho && item.largo ? `${item.ancho} × ${item.largo} cm` : '-';
+            copias = item.copias || 1;
+            mlTotal = item.ml_total ? item.ml_total.toFixed(2) : '0.00';
+            m2Total = item.m2_total ? item.m2_total.toFixed(2) : '0.00';
+            fechaHora = item.fecha ? new Date(item.fecha).toLocaleString('es-ES') + ' ' + item.hora : '-';
+        } else {
+            dimensions = item.ancho_cm && item.largo_cm ? `${item.ancho_cm} × ${item.largo_cm} cm` : '-';
+            copias = `${item.copias_requeridas} / ${item.copias_impresas || 0}`;
+            mlTotal = item.ml_total ? item.ml_total.toFixed(2) : '0.00';
+            m2Total = item.m2_total ? item.m2_total.toFixed(2) : '0.00';
+            fechaHora = item.fecha1 ? new Date(item.fecha1).toLocaleString('es-ES') : '-';
+            produccion = item.produccion ? item.produccion.toFixed(1) + '%' : '0.0%';
+        }
 
         tableHTML += `
             <tr 
                 data-row-id="${item.id}"
-                data-codigoimagen="${item.codigoimagen}"
+                data-codigoimagen="${item.codigoimagen || ''}"
                 data-pcname="${item.pc_name}"
                 ${isSelected ? 'selected' : ''}
                 style="border-bottom: 1px solid #eee; cursor: pointer; 
@@ -458,20 +510,20 @@ function updateTable() {
                            style="margin: 0; cursor: pointer;">
                 </td>
                 <td class="filename-col" 
-                    title="${item.bmppath || ''}"
+                    title="${item.bmppath || item.archivo || ''}"
                     style="cursor: pointer; word-break: break-all; padding: 12px;"
                     onclick="openImageModal(${item.id})"
                 >
-                    ${item.bmppath || '-'}
+                    ${item.bmppath || item.archivo || '-'}
                 </td>
                 <td style="padding: 12px;">${dimensions}</td>
-                <td style="padding: 12px;">${largoTotal} m</td>
+                <td style="padding: 12px;">${currentType === 'printolog' ? `${mlTotal} m` : ''}</td>
                 <td style="padding: 12px;">${copias}</td>
                 <td style="padding: 12px;">
-                    <span style="background: ${item.completado === 1 ? '#e8f5e8' : '#fff3cd'}; 
-                          color: ${item.completado === 1 ? '#2e7d32' : '#856404'}; 
+                    <span style="background: ${currentType === 'printolog' && item.completado === 1 ? '#e8f5e8' : currentType === 'printolog' && item.completado === 0 ? '#fff3cd' : '#f0f0f0'}; 
+                          color: ${currentType === 'printolog' && item.completado === 1 ? '#2e7d32' : currentType === 'printolog' && item.completado === 0 ? '#856404' : '#666'}; 
                           padding: 2px 8px; border-radius: 12px; font-weight: bold;">
-                        ${produccion}%
+                        ${currentType === 'printolog' ? produccion : (item.evento === 'RIP' ? 'RIP' : 'PRINT')}
                     </span>
                 </td>
                 <td style="padding: 12px;">
@@ -479,7 +531,7 @@ function updateTable() {
                         ${item.pc_name || '-'}
                     </span>
                 </td>
-                <td style="padding: 12px; font-size: 12px;">${fecha1}</td>
+                <td style="padding: 12px; font-size: 12px;">${fechaHora}</td>
                 ${showSizeColumn ? `<td style="padding: 12px;">${m2Total}</td>` : ''}
             </tr>
         `;
@@ -593,16 +645,16 @@ document.addEventListener('click', function(e) {
 
 function openImageModal(rowId) {
     const row = filteredData.find(r => r.id === rowId);
-    if (!row) return;
+    if (!row || !row.codigoimagen) return;
 
     const imgSrc = `get_image.php?codigoimagen=${row.codigoimagen}&pc_name=${encodeURIComponent(row.pc_name)}`;
     
     document.getElementById('modalImage').src = imgSrc;
     document.getElementById('modalBmpPath').textContent = row.bmppath || '-';
-    document.getElementById('modalDimensions').textContent = `${(row.anchomm/10).toFixed(1)} × ${(row.largomm/10).toFixed(1)} cm`;
+    document.getElementById('modalDimensions').textContent = `${row.ancho_cm || '-'} × ${row.largo_cm || '-'} cm`;
     document.getElementById('modalLargoTotal').textContent = row.largototal ? row.largototal.toFixed(2) + ' m' : '-';
-    document.getElementById('modalCopiasReq').textContent = row.copiasrequeridas || 0;
-    document.getElementById('modalCopiasImp').textContent = row.copiasimpresas || 0;
+    document.getElementById('modalCopiasReq').textContent = row.copias_requeridas || 0;
+    document.getElementById('modalCopiasImp').textContent = row.copias_impresas || 0;
     document.getElementById('modalProduccion').textContent = row.produccion ? row.produccion.toFixed(1) + '%' : '-';
     document.getElementById('modalFecha1').textContent = row.fecha1 ? new Date(row.fecha1).toLocaleString('es-ES') : '-';
     document.getElementById('modalFecha2').textContent = row.fecha2 ? new Date(row.fecha2).toLocaleString('es-ES') : '-';
@@ -674,7 +726,6 @@ function setupFilterListeners() {
     document.getElementById('autoRefresh').addEventListener('change', () => { setupAutoRefresh(); saveDashboardState(); });
 }
 
-// Inicializar al cargar
 document.addEventListener('DOMContentLoaded', function() {
     if (debugMode) console.log('🚀 PrintologWeb inicializando...');
     
@@ -687,12 +738,11 @@ document.addEventListener('DOMContentLoaded', function() {
         updateSortIndicators();
         document.addEventListener('click', handleColumnClick);
 
-        // Asociar pestañas
         document.querySelectorAll('.tab-btn').forEach(btn => {
             btn.addEventListener('click', () => {
                 document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
-                currentTable = btn.dataset.table;
+                currentType = btn.dataset.type;
                 currentPage = 1;
                 loadData();
                 saveDashboardState();
@@ -705,7 +755,6 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
-// Guardar estado antes de cerrar
 window.addEventListener('beforeunload', function() {
     saveDashboardState();
     if (autoRefreshInterval) clearInterval(autoRefreshInterval);
