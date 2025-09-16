@@ -340,6 +340,7 @@ function exportData(format, exportAll = false) {
 
 function updateStatsFromServer(stats) {
     document.getElementById('totalJobs').textContent = stats.total || 0;
+
     if (currentType === 'riplog') {
         document.getElementById('completedJobs').textContent = stats.rip_count + stats.print_count || 0;
         document.getElementById('incompleteJobs').textContent = 0;
@@ -347,6 +348,7 @@ function updateStatsFromServer(stats) {
         document.getElementById('completedJobs').textContent = stats.completed_count || 0;
         document.getElementById('incompleteJobs').textContent = stats.incomplete_count || 0;
     }
+
     document.getElementById('mlTotal').textContent = stats.ml_total || 0;
     document.getElementById('m2Total').textContent = stats.m2_total || 0;
     document.getElementById('uniquePcs').textContent = stats.unique_pcs || 0;
@@ -394,11 +396,11 @@ function updateTable() {
         return;
     }
 
-    let sizeColumnHeader = '';
-    let tableHeaders = '';
+    let tableHTML = '';
+    let headers = '';
 
     if (currentType === 'riplog') {
-        tableHeaders = `
+        headers = `
             <th style="padding: 12px; text-align: left;">
                 <input type="checkbox" onchange="toggleSelectAll(this)" 
                        ${selectedRows.size > 0 && selectedRows.size === pageData.length ? 'checked' : ''}>
@@ -426,8 +428,65 @@ function updateTable() {
                 Fecha/Hora <span class="sort-indicator"></span>
             </th>
         `;
-    } else {
-        tableHeaders = `
+
+        tableHTML = `
+            <div class="table-responsive">
+                <table style="width: 100%; border-collapse: collapse;">
+                    <thead>
+                        <tr style="background: #f8f9fa;">
+                            ${headers}
+                        </tr>
+                    </thead>
+                    <tbody>
+        `;
+
+        pageData.forEach(item => {
+            const isSelected = selectedRows.has(item.id);
+            const statusClass = item.evento === 'RIP' ? 'rip-event' : 'print-event';
+            const dimensions = item.ancho && item.largo ? `${item.ancho} × ${item.largo} cm` : '-';
+            const mlTotal = item.ml_total ? item.ml_total.toFixed(2) : '0.00';
+            const m2Total = item.m2_total ? item.m2_total.toFixed(2) : '0.00';
+            const fechaHora = item.fecha ? new Date(item.fecha).toLocaleString('es-ES') + ' ' + item.hora : '-';
+
+            tableHTML += `
+                <tr 
+                    data-row-id="${item.id}"
+                    ${isSelected ? 'selected' : ''}
+                    style="border-bottom: 1px solid #eee; cursor: pointer; 
+                           ${isSelected ? 'border-left: 4px solid #1e88e5; background-color: #f0f7ff; box-shadow: 2px 0 8px rgba(30, 136, 229, 0.15);' : ''}"
+                    onmouseover="this.style.backgroundColor='${isSelected ? '#e6f0ff' : '#f8f9fa'}'"
+                    onmouseout="this.style.backgroundColor='${isSelected ? '#f0f7ff' : 'transparent'}'">
+                    <td style="padding: 12px;">
+                        <input type="checkbox" ${isSelected ? 'checked' : ''} 
+                               onclick="handleRowCheckboxClick(this, '${item.id}')" 
+                               style="margin: 0; cursor: pointer;">
+                    </td>
+                    <td class="filename-col" style="word-break: break-all; padding: 12px;">
+                        ${item.archivo || '-'}
+                    </td>
+                    <td style="padding: 12px;">
+                        <span class="${statusClass}" style="padding: 4px 8px; border-radius: 4px; font-size: 12px; 
+                              background: ${item.evento === 'RIP' ? '#e3f2fd' : '#f3e5f5'}; 
+                              color: ${item.evento === 'RIP' ? '#1976d2' : '#7b1fa2'};">
+                            ${item.evento}
+                        </span>
+                    </td>
+                    <td style="padding: 12px;">${dimensions}</td>
+                    <td style="padding: 12px;">${item.copias || 1}</td>
+                    <td style="padding: 12px;">${mlTotal} m</td>
+                    ${showSizeColumn ? `<td style="padding: 12px;">${m2Total}</td>` : ''}
+                    <td style="padding: 12px;">
+                        <span style="background: #e8f5e8; color: #2e7d32; padding: 2px 6px; border-radius: 3px; font-size: 11px;">
+                            ${item.pc_name || '-'}
+                        </span>
+                    </td>
+                    <td style="padding: 12px; font-size: 12px;">${fechaHora}</td>
+                </tr>
+            `;
+        });
+
+    } else { // printolog
+        headers = `
             <th style="padding: 12px; text-align: left;">
                 <input type="checkbox" onchange="toggleSelectAll(this)" 
                        ${selectedRows.size > 0 && selectedRows.size === pageData.length ? 'checked' : ''}>
@@ -455,92 +514,77 @@ function updateTable() {
             </th>
             ${showSizeColumn ? '<th>M²</th>' : ''}
         `;
+
+        tableHTML = `
+            <div class="table-responsive">
+                <table style="width: 100%; border-collapse: collapse;">
+                    <thead>
+                        <tr style="background: #f8f9fa;">
+                            ${headers}
+                        </tr>
+                    </thead>
+                    <tbody>
+        `;
+
+        pageData.forEach(item => {
+            const isSelected = selectedRows.has(item.id);
+            const anchoCm = item.ancho_cm || '-';
+            const largoCm = item.largo_cm || '-';
+            const dimensions = `${anchoCm} × ${largoCm}`;
+            const mlTotal = item.ml_total ? item.ml_total.toFixed(2) : '0.00';
+            const m2Total = item.m2_total ? item.m2_total.toFixed(2) : '0.00';
+            const copias = `${item.copias_requeridas} / ${item.copias_impresas || 0}`;
+            const produccion = item.produccion ? item.produccion.toFixed(1) + '%' : '0.0%';
+            const fecha1 = item.fecha1 ? new Date(item.fecha1).toLocaleString('es-ES') : '-';
+
+            tableHTML += `
+                <tr 
+                    data-row-id="${item.id}"
+                    data-codigoimagen="${item.codigoimagen || ''}"
+                    data-pcname="${item.pc_name}"
+                    ${isSelected ? 'selected' : ''}
+                    style="border-bottom: 1px solid #eee; cursor: pointer; 
+                           ${isSelected ? 'border-left: 4px solid #1e88e5; background-color: #f0f7ff; box-shadow: 2px 0 8px rgba(30, 136, 229, 0.15);' : ''}"
+                    onmouseover="this.style.backgroundColor='${isSelected ? '#e6f0ff' : '#f8f9fa'}'"
+                    onmouseout="this.style.backgroundColor='${isSelected ? '#f0f7ff' : 'transparent'}'">
+                    <td style="padding: 12px;">
+                        <input type="checkbox" ${isSelected ? 'checked' : ''} 
+                               onclick="handleRowCheckboxClick(this, '${item.id}')" 
+                               style="margin: 0; cursor: pointer;">
+                    </td>
+                    <td class="filename-col" 
+                        title="${item.bmppath || ''}"
+                        style="cursor: pointer; word-break: break-all; padding: 12px;"
+                        onclick="openImageModal(${item.id})"
+                    >
+                        ${item.bmppath || '-'}
+                    </td>
+                    <td style="padding: 12px;">${dimensions}</td>
+                    <td style="padding: 12px;">${mlTotal} m</td>
+                    <td style="padding: 12px;">${copias}</td>
+                    <td style="padding: 12px;">
+                        <span style="background: ${item.completado === 1 ? '#e8f5e8' : '#fff3cd'}; 
+                              color: ${item.completado === 1 ? '#2e7d32' : '#856404'}; 
+                              padding: 2px 8px; border-radius: 12px; font-weight: bold;">
+                            ${produccion}
+                        </span>
+                    </td>
+                    <td style="padding: 12px;">
+                        <span style="background: #e8f5e8; color: #2e7d32; padding: 2px 6px; border-radius: 3px; font-size: 11px;">
+                            ${item.pc_name || '-'}
+                        </span>
+                    </td>
+                    <td style="padding: 12px; font-size: 12px;">${fecha1}</td>
+                    ${showSizeColumn ? `<td style="padding: 12px;">${m2Total}</td>` : ''}
+                </tr>
+            `;
+        });
     }
 
-    let tableHTML = `
-        <div class="table-responsive">
-            <table style="width: 100%; border-collapse: collapse;">
-                <thead>
-                    <tr style="background: #f8f9fa;">
-                        ${tableHeaders}
-                    </tr>
-                </thead>
-                <tbody>
-    `;
-
-    pageData.forEach(item => {
-        const isSelected = selectedRows.has(item.id);
-        let statusClass = '';
-        let dimensions = '-';
-        let copias = '-';
-        let mlTotal = '0.00';
-        let m2Total = '0.00';
-        let fechaHora = '-';
-        let produccion = '0.0%';
-
-        if (currentType === 'riplog') {
-            statusClass = item.evento === 'RIP' ? 'rip-event' : 'print-event';
-            dimensions = item.ancho && item.largo ? `${item.ancho} × ${item.largo} cm` : '-';
-            copias = item.copias || 1;
-            mlTotal = item.ml_total ? item.ml_total.toFixed(2) : '0.00';
-            m2Total = item.m2_total ? item.m2_total.toFixed(2) : '0.00';
-            fechaHora = item.fecha ? new Date(item.fecha).toLocaleString('es-ES') + ' ' + item.hora : '-';
-        } else {
-            dimensions = item.ancho_cm && item.largo_cm ? `${item.ancho_cm} × ${item.largo_cm} cm` : '-';
-            copias = `${item.copias_requeridas} / ${item.copias_impresas || 0}`;
-            mlTotal = item.ml_total ? item.ml_total.toFixed(2) : '0.00';
-            m2Total = item.m2_total ? item.m2_total.toFixed(2) : '0.00';
-            fechaHora = item.fecha1 ? new Date(item.fecha1).toLocaleString('es-ES') : '-';
-            produccion = item.produccion ? item.produccion.toFixed(1) + '%' : '0.0%';
-        }
-
-        tableHTML += `
-            <tr 
-                data-row-id="${item.id}"
-                data-codigoimagen="${item.codigoimagen || ''}"
-                data-pcname="${item.pc_name}"
-                ${isSelected ? 'selected' : ''}
-                style="border-bottom: 1px solid #eee; cursor: pointer; 
-                       ${isSelected ? 'border-left: 4px solid #1e88e5; background-color: #f0f7ff; box-shadow: 2px 0 8px rgba(30, 136, 229, 0.15);' : ''}"
-                onmouseover="this.style.backgroundColor='${isSelected ? '#e6f0ff' : '#f8f9fa'}'"
-                onmouseout="this.style.backgroundColor='${isSelected ? '#f0f7ff' : 'transparent'}'">
-                <td style="padding: 12px;">
-                    <input type="checkbox" ${isSelected ? 'checked' : ''} 
-                           onclick="handleRowCheckboxClick(this, '${item.id}')" 
-                           style="margin: 0; cursor: pointer;">
-                </td>
-                <td class="filename-col" 
-                    title="${item.bmppath || item.archivo || ''}"
-                    style="cursor: pointer; word-break: break-all; padding: 12px;"
-                    onclick="openImageModal(${item.id})"
-                >
-                    ${item.bmppath || item.archivo || '-'}
-                </td>
-                <td style="padding: 12px;">${dimensions}</td>
-                <td style="padding: 12px;">${currentType === 'printolog' ? `${mlTotal} m` : ''}</td>
-                <td style="padding: 12px;">${copias}</td>
-                <td style="padding: 12px;">
-                    <span style="background: ${currentType === 'printolog' && item.completado === 1 ? '#e8f5e8' : currentType === 'printolog' && item.completado === 0 ? '#fff3cd' : '#f0f0f0'}; 
-                          color: ${currentType === 'printolog' && item.completado === 1 ? '#2e7d32' : currentType === 'printolog' && item.completado === 0 ? '#856404' : '#666'}; 
-                          padding: 2px 8px; border-radius: 12px; font-weight: bold;">
-                        ${currentType === 'printolog' ? produccion : (item.evento === 'RIP' ? 'RIP' : 'PRINT')}
-                    </span>
-                </td>
-                <td style="padding: 12px;">
-                    <span style="background: #e8f5e8; color: #2e7d32; padding: 2px 6px; border-radius: 3px; font-size: 11px;">
-                        ${item.pc_name || '-'}
-                    </span>
-                </td>
-                <td style="padding: 12px; font-size: 12px;">${fechaHora}</td>
-                ${showSizeColumn ? `<td style="padding: 12px;">${m2Total}</td>` : ''}
-            </tr>
-        `;
-    });
-
     tableHTML += `
-                </tbody>
-            </table>
-        </div>
+                    </tbody>
+                </table>
+            </div>
     `;
 
     const totalPages = Math.ceil(filteredData.length / itemsPerPage);
