@@ -187,26 +187,29 @@ if (!$conn) {
     </div>
 </div>
 
-<!-- MODAL PARA VER IMAGEN Y DETALLES -->
-<div id="imageModal" class="modal" style="display: none;">
+<!-- MODAL DE DETALLE DE IMPRESIÓN -->
+<div id="imageModal" class="modal">
+    <div class="modal-overlay"></div>
     <div class="modal-content">
         <span class="close">&times;</span>
-        <h2>Detalle de la Impresión</h2>
+        <h2>🔍 Detalle de la Impresión</h2>
+        
         <div class="modal-image-container">
-            <img id="modalImage" src="" alt="Imagen de impresión" style="max-width: 100%; max-height: 400px; object-fit: contain; margin: 20px auto; display: block;">
+            <img id="modalImage" src="" alt="Imagen de impresión" onerror="this.src='images/placeholder.png'">
         </div>
+
         <div class="modal-details">
-            <p><strong>Archivo:</strong> <span id="modalBmpPath">-</span></p>
-            <p><strong>Dimensiones:</strong> <span id="modalDimensions">-</span></p>
-            <p><strong>Largo total:</strong> <span id="modalLargoTotal">-</span> m</p>
-            <p><strong>Copias:</strong> <span id="modalCopiasReq">-</span> enviadas / <span id="modalCopiasImp">-</span> impresas</p>
-            <p><strong>Duración:</strong> <span id="modalDuracion">-</span></p>
-            <p><strong>Producción:</strong> <span id="modalProduccion">-</span>%</p>
-            <p><strong>Fecha inicio:</strong> <span id="modalFecha1">-</span></p>
-            <p><strong>Fecha fin:</strong> <span id="modalFecha2">-</span></p>
-            <p><strong>Modo de impresión:</strong> <span id="modalModo">-</span></p>
-            <p><strong>PC:</strong> <span id="modalPcName">-</span></p>
-            <p><strong>UID:</strong> <span id="modalUID">-</span></p>
+            <p><strong>📄 Archivo:</strong> <span id="modalBmpPath">-</span></p>
+            <p><strong>📏 Dimensiones:</strong> <span id="modalDimensions">-</span></p>
+            <p><strong>📏 Largo total:</strong> <span id="modalLargoTotal">-</span> m</p>
+            <p><strong>📑 Copias:</strong> <span id="modalCopiasReq">-</span> enviadas / <span id="modalCopiasImp">-</span> impresas</p>
+            <p><strong>⏱️ Duración:</strong> <span id="modalDuracion">-</span></p>
+            <p><strong>📈 Producción:</strong> <span id="modalProduccion">-</span>%</p>
+            <p><strong>📅 Fecha inicio:</strong> <span id="modalFecha1">-</span></p>
+            <p><strong>📅 Fecha fin:</strong> <span id="modalFecha2">-</span></p>
+            <p><strong>🖨️ Modo de impresión:</strong> <span id="modalModo">-</span></p>
+            <p><strong>💻 PC:</strong> <span id="modalPcName">-</span></p>
+            <p><strong>🔢 UID:</strong> <span id="modalUID">-</span></p>
         </div>
     </div>
 </div>

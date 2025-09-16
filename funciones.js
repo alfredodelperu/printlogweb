@@ -706,16 +706,20 @@ document.addEventListener('click', function(e) {
     updateSelectedStats();
 });
 
+
 function openImageModal(rowId) {
     const row = filteredData.find(r => r.id === rowId);
-    if (!row || !row.codigoimagen) return;
+    if (!row || !row.codigoimagen) {
+        alert("No hay imagen asociada a esta impresión.");
+        return;
+    }
 
     const imgSrc = `get_image.php?codigoimagen=${row.codigoimagen}&pc_name=${encodeURIComponent(row.pc_name)}`;
     
     document.getElementById('modalImage').src = imgSrc;
     document.getElementById('modalBmpPath').textContent = row.bmppath || '-';
     document.getElementById('modalDimensions').textContent = `${row.ancho_cm || '-'} × ${row.largo_cm || '-'} cm`;
-    document.getElementById('modalLargoTotal').textContent = row.largototal ? row.largototal.toFixed(2) + ' m' : '-';
+    document.getElementById('modalLargoTotal').textContent = row.largototal ? (row.largototal / 1000).toFixed(2) + ' m' : '-';
     document.getElementById('modalCopiasReq').textContent = row.copias_requeridas || 0;
     document.getElementById('modalCopiasImp').textContent = row.copias_impresas || 0;
     document.getElementById('modalProduccion').textContent = row.produccion ? row.produccion.toFixed(1) + '%' : '-';
@@ -732,8 +736,10 @@ function openImageModal(rowId) {
     const duracionFormat = `${horas.toString().padStart(2, '0')}:${minutos.toString().padStart(2, '0')}:${segundos.toString().padStart(2, '0')}`;
     document.getElementById('modalDuracion').textContent = duracionFormat;
 
+    // Mostrar el modal
     document.getElementById('imageModal').style.display = 'block';
 }
+
 
 document.querySelector('.close').onclick = function() {
     document.getElementById('imageModal').style.display = 'none';
@@ -878,4 +884,23 @@ document.addEventListener('DOMContentLoaded', function() {
 window.addEventListener('beforeunload', function() {
     saveDashboardState();
     if (autoRefreshInterval) clearInterval(autoRefreshInterval);
+});
+
+// Cerrar modal al hacer clic en X
+document.querySelector('.close').addEventListener('click', function() {
+    document.getElementById('imageModal').style.display = 'none';
+});
+
+// Cerrar modal al hacer clic fuera del contenido
+document.getElementById('imageModal').addEventListener('click', function(e) {
+    if (e.target.classList.contains('modal-overlay') || e.target.classList.contains('close')) {
+        document.getElementById('imageModal').style.display = 'none';
+    }
+});
+
+// Cerrar con tecla ESC
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        document.getElementById('imageModal').style.display = 'none';
+    }
 });
