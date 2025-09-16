@@ -1,5 +1,5 @@
 <?php
-// api.php - Versión final con tres fuentes independientes: riplog, HistoryTasks, RecordTasks
+// api.php - Versión final corregida y sin errores de sintaxis
 include "config.php";
 header('Content-Type: application/json');
 
