@@ -6,6 +6,7 @@ let allPcs = [];
 let currentPage = 1;
 const itemsPerPage = 50; // ✅ Cambiado de 20 a 50
 let isLoadingData = false;
+let debugMode = false; // ✅ AÑADIDO AQUÍ
 
 // Estado de ordenamiento - cargado desde localStorage si existe
 let sortOrder = JSON.parse(localStorage.getItem('dashboardSortOrder')) || {
@@ -352,8 +353,8 @@ function exportData(format, exportAll = false) {
 
 function updateStatsFromServer(stats) {
     document.getElementById('totalJobs').textContent = stats.total || 0;
-    document.getElementById('ripJobs').textContent = stats.rip_count || 0;
-    document.getElementById('printJobs').textContent = stats.print_count || 0;
+    document.getElementById('completedJobs').textContent = stats.completed_count || 0;
+    document.getElementById('incompleteJobs').textContent = stats.incomplete_count || 0;
     document.getElementById('mlTotal').textContent = stats.ml_total || 0;
     document.getElementById('m2Total').textContent = stats.m2_total || 0;
     document.getElementById('uniquePcs').textContent = stats.unique_pcs || 0;
