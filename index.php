@@ -1,3 +1,39 @@
+<?php
+// index.php - Versión con verificación temprana de conexión a PostgreSQL
+require_once 'config.php';
+
+// 🚨 VERIFICACIÓN TEMPRANA DE CONEXIÓN A BASE DE DATOS
+if (!$conn) {
+    die('<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>❌ Error Crítico - PrintologWeb</title>
+    <style>
+        body { font-family: Arial, sans-serif; background: #f44336; color: white; text-align: center; padding: 50px; }
+        .error-box { background: rgba(255,255,255,0.1); border-radius: 10px; padding: 30px; margin: auto; max-width: 600px; }
+        code { background: #333; padding: 8px 12px; border-radius: 4px; display: block; margin: 15px auto; font-size: 14px; }
+    </style>
+</head>
+<body>
+    <div class="error-box">
+        <h1>🚨 ERROR CRÍTICO: No se puede conectar a la base de datos</h1>
+        <p>Por favor, verifica que:</p>
+        <ul style="text-align: left; margin-left: 15px;">
+            <li>El servicio <code>fc_memoria</code> esté activo en EasyPanel</li>
+            <li>La red Docker del contenedor PHP esté conectada a <code>easypanel_default</code></li>
+            <li>Las credenciales en <code>config.php</code> sean correctas</li>
+        </ul>
+        <p><strong>Detalle técnico:</strong></p>
+        <code>' . htmlspecialchars(pg_last_error()) . '</code>
+    </div>
+</body>
+</html>');
+}
+
+// Si la conexión es exitosa, seguimos cargando el dashboard normalmente
+?>
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
