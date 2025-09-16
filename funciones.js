@@ -177,7 +177,9 @@ async function loadData() {
         updateStatsFromServer(result.stats || {});
         selectedRows.clear();
         currentPage = 1;
+        updateEventFilterLabel(); // ← AÑADE ESTA LÍNEA
         updateTable();
+        updateTableTitle(); // ← AÑADE ESTA LÍNEA
 
         document.getElementById('lastUpdate').textContent = `Última actualización: ${new Date().toLocaleString()}`;
 
@@ -790,6 +792,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 currentPage = 1;
                 loadData();
                 saveDashboardState();
+                updateEventFilterLabel(); // ← AÑADE ESTA LÍNEA
             });
         });
 
@@ -803,3 +806,44 @@ window.addEventListener('beforeunload', function() {
     saveDashboardState();
     if (autoRefreshInterval) clearInterval(autoRefreshInterval);
 });
+
+
+function updateEventFilterLabel() {
+    const filterSelect = document.getElementById('eventFilter');
+    const label = document.querySelector('.filter-group[label="🎯 Estado"] label'); // Busca el label
+
+    if (!filterSelect || !label) return;
+
+    if (currentType === 'riplog') {
+        filterSelect.innerHTML = `
+            <option value="">Todos los eventos</option>
+            <option value="RIP">Solo RIP</option>
+            <option value="PRINT">Solo PRINT</option>
+        `;
+        label.textContent = "🎯 Tipo de Evento";
+    } else {
+        filterSelect.innerHTML = `
+            <option value="">Todos los estados</option>
+            <option value="1">Completadas</option>
+            <option value="0">Incompletas</option>
+        `;
+        label.textContent = "🎯 Estado";
+    }
+}
+
+function updateTableTitle() {
+    const title = document.getElementById('tableTitle');
+    if (!title) return;
+
+    switch(currentType) {
+        case 'riplog':
+            title.textContent = '📄 Registro de Procesos RIP / PRINT';
+            break;
+        case 'history':
+            title.textContent = '✅ Registro de Impresiones - Historial (Completadas)';
+            break;
+        case 'record':
+            title.textContent = '⏳ Registro de Impresiones - En Proceso (Record)';
+            break;
+    }
+}

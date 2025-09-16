@@ -49,9 +49,9 @@ if (!$conn) {
 
     <!-- PESTAÑAS UNIFICADAS -->
     <div class="table-selector">
-        <button class="tab-btn" data-type="riplog">RIP / PRINT</button>
-        <button class="tab-btn" data-type="history">Historial</button>
-        <button class="tab-btn" data-type="record">En Proceso</button>
+        <button class="tab-btn active" data-type="riplog">📄 RIP / PRINT</button>
+        <button class="tab-btn" data-type="history">✅ Historial (Completadas)</button>
+        <button class="tab-btn" data-type="record">⏳ En Proceso (Record)</button>
     </div>
 
     <div class="stats-grid">
@@ -132,17 +132,17 @@ if (!$conn) {
             <div class="filter-group">
                 <label class="filter-label">🎯 Tipo</label>
                 <select class="filter-select" id="eventFilter">
-                    <option value="">Todos los estados</option>
-                    <option value="1">Completadas</option>
-                    <option value="0">Incompletas</option>
-                </select>
+                <option value="">Todos los eventos</option>
+                <option value="RIP">Solo RIP</option>
+                <option value="PRINT">Solo PRINT</option>
+            </select>
             </div>
         </div>
     </div>
 
     <div class="table-container">
         <div class="table-header">
-            <h2 class="table-title">📊 Registro de Actividad</h2>
+            <h2 class="table-title" id="tableTitle">📊 Registro de Actividad</h2>
             <div class="table-controls">
                 <div class="show-size-toggle">
                     <label class="switch">
