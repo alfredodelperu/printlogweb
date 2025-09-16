@@ -1,16 +1,18 @@
+// funciones.js - Versión final limpia y profesional para printologweb
+
 let autoRefreshInterval;
 let allData = [];
 let filteredData = [];
 let selectedRows = new Set();
 let allPcs = [];
 let currentPage = 1;
-const itemsPerPage = 50; // ✅ Cambiado de 20 a 50
+const itemsPerPage = 50;
 let isLoadingData = false;
-let debugMode = false; // ✅ AÑADIDO AQUÍ
+let debugMode = false;
 
-// Estado de ordenamiento - cargado desde localStorage si existe
+// Estado de ordenamiento
 let sortOrder = JSON.parse(localStorage.getItem('dashboardSortOrder')) || {
-    column: 'fecha,hora', // ✅ Orden por fecha/hora por defecto
+    column: 'fecha1',
     direction: 'desc'
 };
 
@@ -25,6 +27,7 @@ function saveDashboardState() {
         showSizeColumn: document.getElementById('showSizeColumn').checked,
         autoRefresh: document.getElementById('autoRefresh').checked,
         selectedPcs: Array.from(document.querySelectorAll('#pcFilter input[type="checkbox"]:checked:not(#selectAllPcs)')).map(cb => cb.value),
+        currentTable: currentTable
     };
     localStorage.setItem('dashboardState', JSON.stringify(state));
     if (debugMode) console.log('💾 Dashboard state guardado:', state);
@@ -43,6 +46,15 @@ function loadDashboardState() {
     document.getElementById('eventFilter').value = state.eventFilter || '';
     document.getElementById('showSizeColumn').checked = state.showSizeColumn || false;
     document.getElementById('autoRefresh').checked = state.autoRefresh || true;
+    currentTable = state.currentTable || 'HistoryTasks';
+
+    // Actualizar pestaña activa
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.remove('active');
+        if (btn.dataset.table === currentTable) {
+            btn.classList.add('active');
+        }
+    });
 
     const pcCheckboxes = document.querySelectorAll('#pcFilter input[type="checkbox"]:not(#selectAllPcs)');
     pcCheckboxes.forEach(cb => {
@@ -54,14 +66,14 @@ function loadDashboardState() {
 }
 
 function initializeDates() {
-    const today = new Date().toLocaleDateString('en-CA'); // ✅ Corregido: usa zona local
+    const today = new Date().toISOString().split('T')[0];
     document.getElementById('dateFrom').value = today;
     document.getElementById('dateTo').value = today;
-    console.log('✅ Fechas inicializadas:', today);
+    if (debugMode) console.log('✅ Fechas inicializadas:', today);
 }
 
 function setDateRange(range) {
-    console.log('🗓️ Estableciendo rango de fecha:', range);
+    if (debugMode) console.log('🗓️ Estableciendo rango de fecha:', range);
     const today = new Date();
     let startDate, endDate;
 
@@ -110,34 +122,16 @@ function setDateRange(range) {
         document.querySelector(`[onclick="setDateRange('${range}')"]`)?.classList.add('active');
     }
 
-    loadData(); // ✅ Actualiza automáticamente
-}
-
-function calculateML(ancho, largo, copias) {
-    if (!ancho || !largo || !copias) return 0;
-    const anchoNum = parseFloat(ancho);
-    const largoNum = parseFloat(largo);
-    const copiasNum = parseInt(copias);
-    let dimension = (anchoNum >= 60 || largoNum >= 60) ? Math.max(anchoNum, largoNum) : Math.min(anchoNum, largoNum);
-    return (dimension * copiasNum / 100).toFixed(2);
-}
-
-function calculateM2(ancho, largo, copias) {
-    if (!ancho || !largo || !copias) return 0;
-    const anchoNum = parseFloat(ancho);
-    const largoNum = parseFloat(largo);
-    const copiasNum = parseInt(copias);
-    return ((anchoNum * largoNum * copiasNum) / 10000).toFixed(2);
+    loadData(); // Actualiza automáticamente
 }
 
 async function loadData() {
     if (isLoadingData) return;
     isLoadingData = true;
 
-    const refreshBtn = document.querySelector('.refresh-btn');
-
     try {
         const params = new URLSearchParams();
+        params.append('table', currentTable);
 
         const dateFromValue = document.getElementById('dateFrom').value;
         const dateToValue = document.getElementById('dateTo').value;
@@ -168,7 +162,7 @@ async function loadData() {
         }
 
         const apiUrl = `api.php?${params.toString()}`;
-        console.log('🌐 URL API:', apiUrl);
+        if (debugMode) console.log('🌐 URL API:', apiUrl);
 
         const response = await fetch(apiUrl);
         if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -181,7 +175,7 @@ async function loadData() {
 
         if (result.pcs_list && JSON.stringify(result.pcs_list) !== JSON.stringify(allPcs)) {
             allPcs = result.pcs_list;
-            updatePcFilter(); // ← ¡Aquí se generan los checkboxes!
+            updatePcFilter();
         }
 
         updateStatsFromServer(result.stats || {});
@@ -203,9 +197,6 @@ async function loadData() {
             </div>
         `;
     } finally {
-        if (refreshBtn) {
-            refreshBtn.classList.remove('loading');
-        }
         isLoadingData = false;
     }
 }
@@ -228,7 +219,7 @@ function updatePcFilter() {
 }
 
 function onPcChange(checkbox) {
-    console.log('💻 PC cambiada:', checkbox.value, checkbox.checked);
+    if (debugMode) console.log('💻 PC cambiada:', checkbox.value, checkbox.checked);
     updateSelectAllPcsState();
     debounceLoadData();
 }
@@ -252,9 +243,8 @@ function updateSelectAllPcsState() {
     }
 }
 
-
 function toggleAllPcs(checkbox) {
-    console.log('🔄 Toggle todas las PCs:', checkbox.checked);
+    if (debugMode) console.log('🔄 Toggle todas las PCs:', checkbox.checked);
     const pcCheckboxes = document.querySelectorAll('#pcFilter input[type="checkbox"]:not(#selectAllPcs)');
     pcCheckboxes.forEach(cb => {
         cb.checked = checkbox.checked;
@@ -309,6 +299,7 @@ function toggleSelectAll(checkbox) {
 function exportData(format, exportAll = false) {
     const params = new URLSearchParams();
     params.append('format', format);
+    params.append('table', currentTable);
 
     if (selectedRows.size > 0) {
         params.append('selected', Array.from(selectedRows).join(','));
@@ -361,25 +352,6 @@ function updateStatsFromServer(stats) {
     updateSelectedStats();
 }
 
-function updateStats() {
-    const stats = {
-        total: filteredData.length,
-        rip_count: filteredData.filter(item => item.evento === 'RIP').length,
-        print_count: filteredData.filter(item => item.evento === 'PRINT').length,
-        ml_total: filteredData.reduce((sum, item) => sum + parseFloat(item.ml_total || 0), 0).toFixed(2),
-        m2_total: filteredData.reduce((sum, item) => sum + parseFloat(item.m2_total || 0), 0).toFixed(2),
-        unique_pcs: new Set(filteredData.map(item => item.pc_name).filter(pc => pc)).size
-    };
-
-    document.getElementById('totalJobs').textContent = stats.total;
-    document.getElementById('ripJobs').textContent = stats.rip_count;
-    document.getElementById('printJobs').textContent = stats.print_count;
-    document.getElementById('mlTotal').textContent = stats.ml_total;
-    document.getElementById('m2Total').textContent = stats.m2_total;
-    document.getElementById('uniquePcs').textContent = stats.unique_pcs;
-    updateSelectedStats();
-}
-
 function updateSelectedStats() {
     if (selectedRows.size === 0) {
         document.querySelectorAll('.stat-number-selected').forEach(el => el.style.display = 'none');
@@ -388,16 +360,16 @@ function updateSelectedStats() {
     const selectedData = filteredData.filter(item => selectedRows.has(item.id));
     const selectedStats = {
         total: selectedData.length,
-        rip_count: selectedData.filter(item => item.evento === 'RIP').length,
-        print_count: selectedData.filter(item => item.evento === 'PRINT').length,
-        ml_total: selectedData.reduce((sum, item) => sum + parseFloat(item.ml_total || 0), 0).toFixed(2),
-        m2_total: selectedData.reduce((sum, item) => sum + parseFloat(item.m2_total || 0), 0).toFixed(2),
+        completed_count: selectedData.filter(item => item.completado === 1).length,
+        incomplete_count: selectedData.filter(item => item.completado === 0).length,
+        ml_total: selectedData.reduce((sum, item) => sum + parseFloat(item.largototal || 0), 0).toFixed(2),
+        m2_total: selectedData.reduce((sum, item) => sum + parseFloat(item.anchomm * item.largomm / 1000000 || 0), 0).toFixed(2),
         unique_pcs: new Set(selectedData.map(item => item.pc_name).filter(pc => pc)).size
     };
 
     document.getElementById('totalJobsSelected').textContent = `Selec: ${selectedStats.total}`;
-    document.getElementById('ripJobsSelected').textContent = `Selec: ${selectedStats.rip_count}`;
-    document.getElementById('printJobsSelected').textContent = `Selec: ${selectedStats.print_count}`;
+    document.getElementById('completedJobsSelected').textContent = `Selec: ${selectedStats.completed_count}`;
+    document.getElementById('incompleteJobsSelected').textContent = `Selec: ${selectedStats.incomplete_count}`;
     document.getElementById('mlTotalSelected').textContent = `Selec: ${selectedStats.ml_total}`;
     document.getElementById('m2TotalSelected').textContent = `Selec: ${selectedStats.m2_total}`;
     document.getElementById('uniquePcsSelected').textContent = `Selec: ${selectedStats.unique_pcs}`;
@@ -421,7 +393,7 @@ function updateTable() {
         return;
     }
 
-    const sizeColumnHeader = showSizeColumn ? '<th>Tamaño (m²)</th>' : '';
+    const sizeColumnHeader = showSizeColumn ? '<th>M²</th>' : '';
 
     let tableHTML = `
         <div class="table-responsive">
@@ -432,28 +404,28 @@ function updateTable() {
                             <input type="checkbox" onchange="toggleSelectAll(this)" 
                                    ${selectedRows.size > 0 && selectedRows.size === pageData.length ? 'checked' : ''}>
                         </th>
-                        <th class="filename-col" style="cursor: pointer;" data-column="archivo">
+                        <th class="filename-col" style="cursor: pointer;" data-column="bmppath">
                             Archivo <span class="sort-indicator"></span>
                         </th>
-                        <th class="event-col" style="cursor: pointer;" data-column="evento">
-                            Evento <span class="sort-indicator"></span>
+                        <th class="dimensions-col" style="cursor: pointer;" data-column="anchomm,largomm">
+                            Dimensiones (cm) <span class="sort-indicator"></span>
                         </th>
-                        <th class="dimensions-col" style="cursor: pointer;" data-column="ancho,largo">
-                            Dimensiones <span class="sort-indicator"></span>
+                        <th class="largo-col" style="cursor: pointer;" data-column="largototal">
+                            Largo Total (m) <span class="sort-indicator"></span>
                         </th>
-                        <th class="copies-col" style="cursor: pointer;" data-column="copias">
+                        <th class="copies-col" style="cursor: pointer;" data-column="copiasrequeridas">
                             Copias <span class="sort-indicator"></span>
                         </th>
-                        <th class="ml-col" style="cursor: pointer;" data-column="ml_total">
-                            ML Total <span class="sort-indicator"></span>
+                        <th class="produccion-col" style="cursor: pointer;" data-column="produccion">
+                            Producción (%) <span class="sort-indicator"></span>
                         </th>
-                        ${sizeColumnHeader}
                         <th class="pc-col" style="cursor: pointer;" data-column="pc_name">
                             PC <span class="sort-indicator"></span>
                         </th>
-                        <th class="date-col" style="cursor: pointer;" data-column="fecha,hora">
+                        <th class="date-col" style="cursor: pointer;" data-column="fecha1">
                             Fecha/Hora <span class="sort-indicator"></span>
                         </th>
+                        ${sizeColumnHeader}
                     </tr>
                 </thead>
                 <tbody>
@@ -461,15 +433,20 @@ function updateTable() {
 
     pageData.forEach(item => {
         const isSelected = selectedRows.has(item.id);
-        const statusClass = item.evento === 'RIP' ? 'rip-event' : 'print-event';
-        const dimensions = item.ancho && item.largo ? `${item.ancho} × ${item.largo} cm` : '-';
-        const mlTotal = item.ml_total ? parseFloat(item.ml_total).toFixed(2) : '0.00';
-        const m2Total = item.m2_total ? parseFloat(item.m2_total).toFixed(2) : '0.00';
-        const sizeColumn = showSizeColumn ? `<td class="m2-col" style="padding: 12px;">${m2Total}</td>` : '';
+        const anchoCm = item.anchomm ? (item.anchomm / 10).toFixed(1) : '-';
+        const largoCm = item.largomm ? (item.largomm / 10).toFixed(1) : '-';
+        const dimensions = `${anchoCm} × ${largoCm}`;
+        const largoTotal = item.largototal ? parseFloat(item.largototal).toFixed(2) : '0.00';
+        const produccion = item.produccion ? parseFloat(item.produccion).toFixed(1) : '0.0';
+        const copias = `${item.copiasrequeridas} / ${item.copiasimpresas || 0}`;
+        const m2Total = item.anchomm && item.largomm ? (item.anchomm * item.largomm / 1000000).toFixed(2) : '0.00';
+        const fecha1 = item.fecha1 ? new Date(item.fecha1).toLocaleString('es-ES') : '-';
 
         tableHTML += `
             <tr 
                 data-row-id="${item.id}"
+                data-codigoimagen="${item.codigoimagen}"
+                data-pcname="${item.pc_name}"
                 ${isSelected ? 'selected' : ''}
                 style="border-bottom: 1px solid #eee; cursor: pointer; 
                        ${isSelected ? 'border-left: 4px solid #1e88e5; background-color: #f0f7ff; box-shadow: 2px 0 8px rgba(30, 136, 229, 0.15);' : ''}"
@@ -480,28 +457,30 @@ function updateTable() {
                            onclick="handleRowCheckboxClick(this, '${item.id}')" 
                            style="margin: 0; cursor: pointer;">
                 </td>
-                <td class="filename-col" title="${item.archivo || ''}">
-                    ${item.archivo || '-'}
-                </td>
-                <td style="padding: 12px;">
-                    <span class="${statusClass}" style="padding: 4px 8px; border-radius: 4px; font-size: 12px; 
-                          background: ${item.evento === 'RIP' ? '#e3f2fd' : '#f3e5f5'}; 
-                          color: ${item.evento === 'RIP' ? '#1976d2' : '#7b1fa2'};">
-                        ${item.evento}
-                    </span>
+                <td class="filename-col" 
+                    title="${item.bmppath || ''}"
+                    style="cursor: pointer; word-break: break-all; padding: 12px;"
+                    onclick="openImageModal(${item.id})"
+                >
+                    ${item.bmppath || '-'}
                 </td>
                 <td style="padding: 12px;">${dimensions}</td>
-                <td style="padding: 12px;">${item.copias || 1}</td>
-                <td style="padding: 12px;">${mlTotal} m</td>
-                ${sizeColumn}
+                <td style="padding: 12px;">${largoTotal} m</td>
+                <td style="padding: 12px;">${copias}</td>
+                <td style="padding: 12px;">
+                    <span style="background: ${item.completado === 1 ? '#e8f5e8' : '#fff3cd'}; 
+                          color: ${item.completado === 1 ? '#2e7d32' : '#856404'}; 
+                          padding: 2px 8px; border-radius: 12px; font-weight: bold;">
+                        ${produccion}%
+                    </span>
+                </td>
                 <td style="padding: 12px;">
                     <span style="background: #e8f5e8; color: #2e7d32; padding: 2px 6px; border-radius: 3px; font-size: 11px;">
                         ${item.pc_name || '-'}
                     </span>
                 </td>
-                <td style="padding: 12px; font-size: 12px;">
-                    ${item.fecha ? new Date(item.fecha).toLocaleString('es-ES') : '-'}
-                </td>
+                <td style="padding: 12px; font-size: 12px;">${fecha1}</td>
+                ${showSizeColumn ? `<td style="padding: 12px;">${m2Total}</td>` : ''}
             </tr>
         `;
     });
@@ -553,7 +532,6 @@ function changePage(page) {
     }
 }
 
-// Manejar clic en encabezados para ordenar
 function updateSortIndicators() {
     document.querySelectorAll('th[data-column] .sort-indicator').forEach(indicator => {
         indicator.textContent = '';
@@ -583,7 +561,6 @@ function handleColumnClick(event) {
     localStorage.setItem('dashboardSortOrder', JSON.stringify(sortOrder));
 }
 
-// Manejar clic en cualquier celda para seleccionar fila
 document.addEventListener('click', function(e) {
     const td = e.target.closest('td');
     if (!td) return;
@@ -614,7 +591,46 @@ document.addEventListener('click', function(e) {
     updateSelectedStats();
 });
 
-// Configuración de auto-refresh
+function openImageModal(rowId) {
+    const row = filteredData.find(r => r.id === rowId);
+    if (!row) return;
+
+    const imgSrc = `get_image.php?codigoimagen=${row.codigoimagen}&pc_name=${encodeURIComponent(row.pc_name)}`;
+    
+    document.getElementById('modalImage').src = imgSrc;
+    document.getElementById('modalBmpPath').textContent = row.bmppath || '-';
+    document.getElementById('modalDimensions').textContent = `${(row.anchomm/10).toFixed(1)} × ${(row.largomm/10).toFixed(1)} cm`;
+    document.getElementById('modalLargoTotal').textContent = row.largototal ? row.largototal.toFixed(2) + ' m' : '-';
+    document.getElementById('modalCopiasReq').textContent = row.copiasrequeridas || 0;
+    document.getElementById('modalCopiasImp').textContent = row.copiasimpresas || 0;
+    document.getElementById('modalProduccion').textContent = row.produccion ? row.produccion.toFixed(1) + '%' : '-';
+    document.getElementById('modalFecha1').textContent = row.fecha1 ? new Date(row.fecha1).toLocaleString('es-ES') : '-';
+    document.getElementById('modalFecha2').textContent = row.fecha2 ? new Date(row.fecha2).toLocaleString('es-ES') : '-';
+    document.getElementById('modalModo').textContent = row.modoimpresion || '-';
+    document.getElementById('modalPcName').textContent = row.pc_name || '-';
+    document.getElementById('modalUID').textContent = row.uid || '-';
+
+    const duracionSegundos = row.tiempotranscurrido2 ? row.tiempotranscurrido2 / 1000 : 0;
+    const horas = Math.floor(duracionSegundos / 3600);
+    const minutos = Math.floor((duracionSegundos % 3600) / 60);
+    const segundos = duracionSegundos % 60;
+    const duracionFormat = `${horas.toString().padStart(2, '0')}:${minutos.toString().padStart(2, '0')}:${segundos.toString().padStart(2, '0')}`;
+    document.getElementById('modalDuracion').textContent = duracionFormat;
+
+    document.getElementById('imageModal').style.display = 'block';
+}
+
+document.querySelector('.close').onclick = function() {
+    document.getElementById('imageModal').style.display = 'none';
+}
+
+window.onclick = function(event) {
+    const modal = document.getElementById('imageModal');
+    if (event.target === modal) {
+        modal.style.display = 'none';
+    }
+}
+
 function setupAutoRefresh() {
     const autoRefreshCheckbox = document.getElementById('autoRefresh');
     
@@ -629,9 +645,9 @@ function setupAutoRefresh() {
                     loadData();
                 }
             }, 30000);
-            console.log('🔄 Auto-refresh activado');
+            if (debugMode) console.log('🔄 Auto-refresh activado');
         } else {
-            console.log('⏸️ Auto-refresh desactivado');
+            if (debugMode) console.log('⏸️ Auto-refresh desactivado');
         }
     }
     
@@ -639,7 +655,6 @@ function setupAutoRefresh() {
     autoRefreshCheckbox.addEventListener('change', updateAutoRefresh);
 }
 
-// Configurar listeners de filtros
 function setupFilterListeners() {
     document.getElementById('dateFrom').addEventListener('change', () => { loadData(); saveDashboardState(); });
     document.getElementById('dateTo').addEventListener('change', () => { loadData(); saveDashboardState(); });
@@ -661,7 +676,7 @@ function setupFilterListeners() {
 
 // Inicializar al cargar
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('🚀 Dashboard inicializando...');
+    if (debugMode) console.log('🚀 PrintologWeb inicializando...');
     
     try {
         initializeDates();
@@ -670,8 +685,21 @@ document.addEventListener('DOMContentLoaded', function() {
         setupAutoRefresh();
         setupFilterListeners();
         updateSortIndicators();
-        document.addEventListener('click', handleColumnClick); // ✅ REGISTRADO AHORA
-        console.log('🎉 Dashboard inicializado correctamente');
+        document.addEventListener('click', handleColumnClick);
+
+        // Asociar pestañas
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                currentTable = btn.dataset.table;
+                currentPage = 1;
+                loadData();
+                saveDashboardState();
+            });
+        });
+
+        if (debugMode) console.log('🎉 PrintologWeb inicializado correctamente');
     } catch (error) {
         console.error('❌ Error en inicialización:', error);
     }
