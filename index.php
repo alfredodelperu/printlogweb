@@ -130,12 +130,12 @@ if (!$conn) {
             </div>
 
             <div class="filter-group">
-                <label class="filter-label">🎯 Tipo</label>
+                <label class="filter-label" id="eventFilterLabel">🎯 Tipo de Evento</label>
                 <select class="filter-select" id="eventFilter">
-                <option value="">Todos los eventos</option>
-                <option value="RIP">Solo RIP</option>
-                <option value="PRINT">Solo PRINT</option>
-            </select>
+                    <option value="">Todos los eventos</option>
+                    <option value="RIP">Solo RIP</option>
+                    <option value="PRINT">Solo PRINT</option>
+                </select>
             </div>
         </div>
     </div>
