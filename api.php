@@ -312,7 +312,9 @@ $pcs_list = [];
 if ($type === 'riplog') {
     $pcQuery = "SELECT DISTINCT pc_name FROM riplog WHERE pc_name IS NOT NULL ORDER BY pc_name";
 } else {
-    $pcQuery = "SELECT DISTINCT pc_name FROM \"{$type === 'history' ? 'HistoryTasks' : 'RecordTasks'}\" WHERE pc_name IS NOT NULL ORDER BY pc_name";
+    $tableName = $type === 'history' ? 'HistoryTasks' : 'RecordTasks';
+    $pcQuery = "SELECT DISTINCT pc_name FROM \"$tableName\" WHERE pc_name IS NOT NULL ORDER BY pc_name";    
+
 }
 $pcResult = pg_query($conn, $pcQuery);
 while ($pcRow = pg_fetch_assoc($pcResult)) {
